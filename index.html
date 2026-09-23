@@ -743,8 +743,8 @@
         '<td class="col-tight"><select class="ln-sides"><option value="1"' + (line.sides===1?" selected":"") + '>1 side</option><option value="2"' + (line.sides===2?" selected":"") + '>2 sides</option></select></td>' +
         '<td class="col-tight"><input type="number" class="ln-area" min="0" step="0.1" value="' + (line.areaSqft||0) + '" style="width:80px;"> sqft</td>' +
         '<td class="col-tight"><input type="number" class="ln-cost" min="0" step="1" value="' + (line.costPerSheet||0) + '" style="width:80px;">/sheet</td>' +
-        '<td class="num">' + sheets.toFixed(2) + '</td>' +
-        '<td class="num">' + fmtMoney(cost) + '</td>' +
+        '<td class="num ln-sheets-cell">' + sheets.toFixed(2) + '</td>' +
+        '<td class="num ln-total-cell">' + fmtMoney(cost) + '</td>' +
         '<td class="col-tight"><span class="remove" data-remove-line="' + line.id + '">✕</span></td>' +
         '</tr>';
     }).join("");
@@ -780,10 +780,10 @@
       '<div class="card">' +
         '<h3><span><span class="step-num">3</span>Adhesive</span></h3>' +
         '<div class="page-sub" style="margin-bottom:10px;">Auto-calculated: each 8ft × 4ft (32 sqft) sheet needs ' + state.settings.adhesiveKgPerSheetPerSide + ' kg of adhesive per side laminated.</div>' +
-        '<div class="estimate-row"><span class="label">Sheets used (across all lines)</span><span class="amt">' + est.sheetsTotal.toFixed(2) + '</span></div>' +
-        '<div class="estimate-row"><span class="label">Adhesive needed</span><span class="amt">' + est.adhesiveKg.toFixed(2) + ' kg</span></div>' +
+        '<div class="estimate-row"><span class="label">Sheets used (across all lines)</span><span class="amt" id="est-sheets">' + est.sheetsTotal.toFixed(2) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Adhesive needed</span><span class="amt" id="est-adhkg">' + est.adhesiveKg.toFixed(2) + ' kg</span></div>' +
         '<div class="estimate-row"><span class="label">Rate (editable in Settings)</span><span class="amt">' + fmtMoney(state.settings.adhesiveCostPerKg) + ' / kg</span></div>' +
-        '<div class="estimate-row"><span class="label">Adhesive cost</span><span class="amt">' + fmtMoney(est.adhesiveCost) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Adhesive cost</span><span class="amt" id="est-adhcost">' + fmtMoney(est.adhesiveCost) + '</span></div>' +
       '</div>' +
 
       '<div class="card">' +
@@ -796,12 +796,12 @@
 
       '<div class="card">' +
         '<h3>Final Estimate</h3>' +
-        '<div class="estimate-row"><span class="label">Laminate materials</span><span class="amt">' + fmtMoney(est.laminateCost) + '</span></div>' +
-        '<div class="estimate-row"><span class="label">Adhesive</span><span class="amt">' + fmtMoney(est.adhesiveCost) + '</span></div>' +
-        '<div class="estimate-row"><span class="label">Labor / fabrication</span><span class="amt">' + fmtMoney(est.laborFlat) + '</span></div>' +
-        '<div class="estimate-row"><span class="label">Subtotal</span><span class="amt">' + fmtMoney(est.subtotal) + '</span></div>' +
-        '<div class="estimate-row"><span class="label">Markup (' + (p.markupPercent||0) + '%)</span><span class="amt">' + fmtMoney(est.markup) + '</span></div>' +
-        '<div class="estimate-total"><span>Total estimate</span><span>' + fmtMoney(est.total) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Laminate materials</span><span class="amt" id="fe-laminate">' + fmtMoney(est.laminateCost) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Adhesive</span><span class="amt" id="fe-adhesive">' + fmtMoney(est.adhesiveCost) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Labor / fabrication</span><span class="amt" id="fe-labor">' + fmtMoney(est.laborFlat) + '</span></div>' +
+        '<div class="estimate-row"><span class="label">Subtotal</span><span class="amt" id="fe-subtotal">' + fmtMoney(est.subtotal) + '</span></div>' +
+        '<div class="estimate-row"><span class="label" id="fe-markup-label">Markup (' + (p.markupPercent||0) + '%)</span><span class="amt" id="fe-markup">' + fmtMoney(est.markup) + '</span></div>' +
+        '<div class="estimate-total"><span>Total estimate</span><span id="fe-total">' + fmtMoney(est.total) + '</span></div>' +
       '</div>';
   }
 
@@ -839,18 +839,18 @@
       var id = row.getAttribute("data-line");
       var line = p.laminateLines.find(function(l){ return l.id === id; });
       if (!line) return;
-      row.querySelector(".ln-sides").addEventListener("change", function(e){ line.sides = parseInt(e.target.value,10); touchProject(p); saveState(); render(); });
-      row.querySelector(".ln-area").addEventListener("input", function(e){ line.areaSqft = parseFloat(e.target.value)||0; touchProject(p); saveState(); softRefreshProjectNumbers(); });
-      row.querySelector(".ln-cost").addEventListener("input", function(e){ line.costPerSheet = parseFloat(e.target.value)||0; touchProject(p); saveState(); softRefreshProjectNumbers(); });
+      row.querySelector(".ln-sides").addEventListener("change", function(e){ line.sides = parseInt(e.target.value,10); touchProject(p); saveState(); updateProjectNumbers(p); });
+      row.querySelector(".ln-area").addEventListener("input", function(e){ line.areaSqft = parseFloat(e.target.value)||0; touchProject(p); saveState(); updateProjectNumbers(p); });
+      row.querySelector(".ln-cost").addEventListener("input", function(e){ line.costPerSheet = parseFloat(e.target.value)||0; touchProject(p); saveState(); updateProjectNumbers(p); });
     });
 
     var nameInput = document.getElementById("projName");
     if (nameInput) nameInput.addEventListener("input", function(e){ p.name = e.target.value || "Untitled Project"; touchProject(p); saveState(); renderProjectList(); titleEl.textContent = p.name; });
 
     var laborInput = document.getElementById("laborFlat");
-    if (laborInput) laborInput.addEventListener("input", function(e){ p.laborFlat = parseFloat(e.target.value)||0; touchProject(p); saveState(); softRefreshProjectNumbers(); });
+    if (laborInput) laborInput.addEventListener("input", function(e){ p.laborFlat = parseFloat(e.target.value)||0; touchProject(p); saveState(); updateProjectNumbers(p); });
     var markupInput = document.getElementById("markupPct");
-    if (markupInput) markupInput.addEventListener("input", function(e){ p.markupPercent = parseFloat(e.target.value)||0; touchProject(p); saveState(); softRefreshProjectNumbers(); });
+    if (markupInput) markupInput.addEventListener("input", function(e){ p.markupPercent = parseFloat(e.target.value)||0; touchProject(p); saveState(); updateProjectNumbers(p); });
 
     document.getElementById("saveProjectBtn").addEventListener("click", function(){ touchProject(p); saveState(); showToast("Project saved"); renderProjectList(); });
     document.getElementById("deleteProjectBtn").addEventListener("click", function(){
@@ -863,8 +863,42 @@
     });
   }
 
-  // Re-render just numbers without losing input focus feel too much — simplest: full render but keep it snappy.
-  function softRefreshProjectNumbers(){ render(); }
+  // Update only the computed numbers in place, without rebuilding the DOM —
+  // rebuilding on every keystroke destroyed focus and closed the on-screen keyboard.
+  function updateProjectNumbers(p){
+    var est = projectEstimate(p);
+
+    document.querySelectorAll("tr[data-line]").forEach(function(row){
+      var id = row.getAttribute("data-line");
+      var line = p.laminateLines.find(function(l){ return l.id === id; });
+      if (!line) return;
+      var sheets = (line.areaSqft || 0) / SHEET_SQFT;
+      var cost = sheets * (line.costPerSheet || 0);
+      var sheetsCell = row.querySelector(".ln-sheets-cell");
+      var totalCell = row.querySelector(".ln-total-cell");
+      if (sheetsCell) sheetsCell.textContent = sheets.toFixed(2);
+      if (totalCell) totalCell.textContent = fmtMoney(cost);
+    });
+
+    setText("est-sheets", est.sheetsTotal.toFixed(2));
+    setText("est-adhkg", est.adhesiveKg.toFixed(2) + " kg");
+    setText("est-adhcost", fmtMoney(est.adhesiveCost));
+
+    setText("fe-laminate", fmtMoney(est.laminateCost));
+    setText("fe-adhesive", fmtMoney(est.adhesiveCost));
+    setText("fe-labor", fmtMoney(est.laborFlat));
+    setText("fe-subtotal", fmtMoney(est.subtotal));
+    setText("fe-markup-label", "Markup (" + (p.markupPercent || 0) + "%)");
+    setText("fe-markup", fmtMoney(est.markup));
+    setText("fe-total", fmtMoney(est.total));
+
+    renderProjectList();
+  }
+
+  function setText(id, text){
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
 
   function handleCadFile(file){
     var p = activeProject();
